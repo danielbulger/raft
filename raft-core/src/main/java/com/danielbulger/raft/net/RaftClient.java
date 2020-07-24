@@ -2,7 +2,6 @@ package com.danielbulger.raft.net;
 
 import com.danielbulger.raft.rpc.RaftConsensus;
 import org.apache.thrift.TException;
-import org.apache.thrift.TServiceClient;
 import org.apache.thrift.protocol.TBinaryProtocol;
 import org.apache.thrift.protocol.TProtocol;
 import org.apache.thrift.transport.TSocket;
@@ -10,7 +9,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.Closeable;
-import java.io.IOException;
 import java.net.InetSocketAddress;
 
 public class RaftClient implements Closeable {
