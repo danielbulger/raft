@@ -1,5 +1,6 @@
 package com.danielbulger.raft.net;
 
+import com.danielbulger.raft.LocalNode;
 import com.danielbulger.raft.rpc.RaftConsensus;
 import org.apache.thrift.TProcessor;
 import org.apache.thrift.server.TServer;
@@ -18,16 +19,20 @@ public class RaftServer {
 
 	private TServer server;
 
-	public void start(InetSocketAddress address) throws TTransportException {
+	public void start(LocalNode node, InetSocketAddress address) throws TTransportException {
+
+		if (node == null) {
+			throw new IllegalArgumentException("node must not be null");
+		}
 
 		if (address == null) {
-			throw new IllegalArgumentException();
+			throw new IllegalArgumentException("address must not be null");
 		}
 
 		final TServerTransport transport = new TServerSocket(address);
 
 		final TProcessor processor = new RaftConsensus.Processor<>(
-			new RaftConsensusService()
+			new RaftConsensusService(node)
 		);
 
 		this.server = new TSimpleServer(

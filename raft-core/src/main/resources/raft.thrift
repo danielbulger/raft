@@ -32,8 +32,8 @@ struct VoteRequest {
 }
 
 struct VoteResponse {
-	1: optional Term term;
-	2: optional bool granted;
+	1: Term term;
+	2: bool granted;
 }
 
 struct InstallSnapshot {
@@ -54,7 +54,7 @@ service RaftConsensus {
 
 	AppendEntriesResponse appendEntries(1: AppendEntriesRequest request),
 
-	VoteResponse vote(1: VoteRequest request),
+	InstallSnapshotResponse installSnapshot(1: InstallSnapshot snapshot),
 
-	InstallSnapshotResponse installSnapshot(1: InstallSnapshot snapshot)
+	VoteResponse vote(1: VoteRequest request)
 }
