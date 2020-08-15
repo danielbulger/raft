@@ -1,0 +1,30 @@
+[
+	{
+		"id": 1,
+		"host": "127.0.0.1",
+		"port": 5500,
+		"heartBeat": 500,
+		"heartBeatTimeout": 4000
+	},
+	{
+		"id": 2,
+		"host": "127.0.0.1",
+		"port": 5501,
+		"heartBeat": 500,
+		"heartBeatTimeout": 5000
+	},
+	{
+		"id": 3,
+		"host": "127.0.0.1",
+		"port": 5502,
+		"heartBeat": 500,
+		"heartBeatTimeout": 6000
+	},
+	{
+		"id": 4,
+		"host": "127.0.0.1",
+		"port": 5503,
+		"heartBeat": 500,
+		"heartBeatTimeout": 7000
+	}
+]

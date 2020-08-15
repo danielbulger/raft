@@ -2,26 +2,26 @@ package com.danielbulger.raft.async;
 
 import com.danielbulger.raft.LocalNode;
 import com.danielbulger.raft.RemoteNode;
-import com.danielbulger.raft.rpc.VoteRequest;
-import com.danielbulger.raft.rpc.VoteResponse;
+import com.danielbulger.raft.rpc.AppendEntriesRequest;
+import com.danielbulger.raft.rpc.AppendEntriesResponse;
 import org.apache.thrift.async.AsyncMethodCallback;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class VoteResponseAsyncHandler implements AsyncMethodCallback<VoteResponse> {
+public class AppendEntriesResponseAsyncHandler implements AsyncMethodCallback<AppendEntriesResponse> {
 
-	private static final Logger LOG = LoggerFactory.getLogger(VoteResponseAsyncHandler.class);
+	private static final Logger LOG = LoggerFactory.getLogger(AppendEntriesResponseAsyncHandler.class);
 
-	private final VoteRequest request;
+	private final AppendEntriesRequest request;
 
 	private final LocalNode node;
 
 	private final RemoteNode peer;
 
-	public VoteResponseAsyncHandler(VoteRequest request, LocalNode node, RemoteNode peer) {
+	public AppendEntriesResponseAsyncHandler(AppendEntriesRequest request, LocalNode node, RemoteNode peer) {
 
 		if (request == null) {
-			throw new IllegalArgumentException("VoteRequest must not be null");
+			throw new IllegalArgumentException("AppendEntriesRequest must not be null");
 		}
 
 		if (node == null) {
@@ -38,14 +38,14 @@ public class VoteResponseAsyncHandler implements AsyncMethodCallback<VoteRespons
 	}
 
 	@Override
-	public void onComplete(VoteResponse response) {
-		node.onVoteResponse(request, response, peer);
+	public void onComplete(AppendEntriesResponse response) {
+		node.onAppendEntryResponse(request, response, peer);
 	}
 
 	@Override
 	public void onError(Exception exception) {
 		LOG.error(
-			"Vote from {} failed due to {}/{}",
+			"AppendEntryRequest from {} failed due to {}/{}",
 			peer.getAddress(),
 			peer.getId(),
 			exception.getMessage()

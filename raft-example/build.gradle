@@ -8,4 +8,6 @@ repositories {
 
 dependencies {
     compile project(':raft-core')
+
+    compile 'ch.qos.logback:logback-classic:1.2.3'
 }

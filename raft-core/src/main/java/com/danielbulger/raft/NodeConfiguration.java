@@ -2,17 +2,19 @@ package com.danielbulger.raft;
 
 import java.net.InetSocketAddress;
 
-public class LocalNodeConfiguration {
+public class NodeConfiguration {
 
 	private final int id;
 
-	private final InetSocketAddress address;
+	private final String host;
+
+	private final int port;
 
 	private final long heartBeat;
 
 	private final long heartBeatTimeout;
 
-	public LocalNodeConfiguration(int id, String host, int port, long heartBeat, long heartBeatTimeout) {
+	public NodeConfiguration(int id, String host, int port, long heartBeat, long heartBeatTimeout) {
 
 		if (heartBeat <= 0) {
 			throw new IllegalArgumentException("heart beat must be > 0 " + heartBeat);
@@ -23,9 +25,10 @@ public class LocalNodeConfiguration {
 		}
 
 		this.id = id;
-		this.address = new InetSocketAddress(host, port);
 		this.heartBeatTimeout = heartBeatTimeout;
 		this.heartBeat = heartBeat;
+		this.host = host;
+		this.port = port;
 	}
 
 
@@ -34,7 +37,7 @@ public class LocalNodeConfiguration {
 	}
 
 	public InetSocketAddress getAddress() {
-		return address;
+		return new InetSocketAddress(host, port);
 	}
 
 	public long getHeartBeat() {
@@ -43,5 +46,16 @@ public class LocalNodeConfiguration {
 
 	public long getHeartBeatTimeout() {
 		return heartBeatTimeout;
+	}
+
+	@Override
+	public String toString() {
+		return "NodeConfiguration{" +
+			"id=" + id +
+			", host='" + host + '\'' +
+			", port=" + port +
+			", heartBeat=" + heartBeat +
+			", heartBeatTimeout=" + heartBeatTimeout +
+			'}';
 	}
 }

@@ -1,17 +1,12 @@
 package com.danielbulger.raft;
 
+import com.danielbulger.raft.async.AppendEntriesResponseAsyncHandler;
 import com.danielbulger.raft.async.VoteResponseAsyncHandler;
-import com.danielbulger.raft.rpc.AppendEntriesRequest;
-import com.danielbulger.raft.rpc.LogEntry;
-import com.danielbulger.raft.rpc.VoteRequest;
-import com.danielbulger.raft.rpc.VoteResponse;
+import com.danielbulger.raft.rpc.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.Map;
-import java.util.NavigableMap;
-import java.util.Optional;
-import java.util.TreeMap;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -22,14 +17,6 @@ import java.util.concurrent.locks.ReentrantLock;
 public class LocalNode extends Node {
 
 	private static final Logger LOG = LoggerFactory.getLogger(LocalNode.class);
-
-	public enum NodeState {
-		FOLLOWER,
-
-		CANDIDATE,
-
-		LEADER
-	}
 
 	private NodeState state = NodeState.FOLLOWER;
 
@@ -65,8 +52,9 @@ public class LocalNode extends Node {
 
 	public LocalNode(
 		StateMachine stateMachine,
-		LocalNodeConfiguration config,
-		ScheduledExecutorService executorService
+		NodeConfiguration config,
+		ScheduledExecutorService executorService,
+		Collection<RemoteNode> peers
 	) {
 
 		super(config.getId(), config.getAddress());
@@ -86,6 +74,8 @@ public class LocalNode extends Node {
 		this.stateMachine = stateMachine;
 
 		this.executorService = executorService;
+
+		this.addPeers(peers);
 	}
 
 	private void cancelHeartBeat() {
@@ -109,30 +99,36 @@ public class LocalNode extends Node {
 	private void scheduleHeartBeat() {
 		cancelHeartBeat();
 
-		heartBeatFuture = executorService.schedule(
+		LOG.debug("Scheduling heart beat...");
+
+		heartBeatFuture = executorService.scheduleWithFixedDelay(
 			this::emitHeartBeat,
+			this.heartBeat,
 			this.heartBeat,
 			TimeUnit.MILLISECONDS
 		);
 	}
 
-	private void scheduleElection() {
+	public void scheduleElection() {
 
 		cancelElection();
 
-		electionFuture = executorService.schedule(
+		LOG.debug("Scheduling Election...");
+
+		electionFuture = executorService.scheduleWithFixedDelay(
 			this::startElection,
+			this.heartBeatTimeout,
 			this.heartBeatTimeout,
 			TimeUnit.MILLISECONDS
 		);
 	}
 
-	public void addRemoteNode(RemoteNode node) {
-		if (node == null) {
-			throw new IllegalArgumentException();
+	public void addPeers(Collection<RemoteNode> nodes) {
+		for (final RemoteNode peer : nodes) {
+			if (peer != null) {
+				peers.put(peer.getId(), peer);
+			}
 		}
-
-		peers.put(node.getId(), node);
 	}
 
 	private void deleteNewerEntries(long logIndex) {
@@ -143,6 +139,10 @@ public class LocalNode extends Node {
 	}
 
 	public boolean appendEntry(AppendEntriesRequest request) {
+
+		if (!peers.containsKey(request.getLeaderId())) {
+			return false;
+		}
 
 		if (request.getTerm() < currentTerm) {
 			LOG.debug("Rejecting entry from {} as not up to date term={},ours={}",
@@ -166,6 +166,32 @@ public class LocalNode extends Node {
 			deleteNewerEntries(logEntry.getIndex());
 
 			return false;
+		}
+
+		voteLock.lock();
+
+		// Reschedule the election task since we have received something
+		this.scheduleElection();
+
+		try {
+
+			// If we were part of an election and received a
+			// valid append RPC then we must revert to a follower state
+			if (state == NodeState.CANDIDATE) {
+				LOG.debug(
+					"Stepping down as candidate as {}/{} is a valid leader",
+					request.getLeaderId(),
+					peers.get(request.getLeaderId()).getAddress()
+				);
+				stepDown(request.getTerm());
+			}
+
+			leaderId = request.getLeaderId();
+
+			votedFor = -1;
+
+		} finally {
+			voteLock.unlock();
 		}
 
 		// Append any missing log entries
@@ -222,9 +248,12 @@ public class LocalNode extends Node {
 			return false;
 		}
 
-		final Optional<LogEntry> optionalLogEntry = getLastLogEntry();
+		final LogEntry logEntry = getLastLogEntry();
 
-		if (optionalLogEntry.isEmpty()) {
+		if (logEntry.getTerm() == 0) {
+
+			votedFor = request.getCandidateId();
+
 			LOG.debug(
 				"Granting vote for {} as they are up to date",
 				request.getCandidateId()
@@ -232,9 +261,10 @@ public class LocalNode extends Node {
 			return true;
 		}
 
-		final LogEntry logEntry = optionalLogEntry.get();
-
 		if (logEntry.getTerm() <= request.getLastLogTerm() && logEntry.getIndex() <= request.getLastLogIndex()) {
+
+			votedFor = request.getCandidateId();
+
 			LOG.debug("Granting vote for {} as they are up to date",
 				request.getCandidateId()
 			);
@@ -252,31 +282,28 @@ public class LocalNode extends Node {
 
 	private VoteRequest buildVoteRequest() {
 
-		final Optional<LogEntry> logEntryOptional = getLastLogEntry();
-
-		long lastTerm = 0L, lastIndex = 0;
-
-		if (logEntryOptional.isPresent()) {
-			lastTerm = logEntryOptional.get().getIndex();
-			lastIndex = logEntryOptional.get().getTerm();
-		}
+		final LogEntry lastEntry = getLastLogEntry();
 
 		return new VoteRequest(
 			this.currentTerm,
-			this.getId(),
-			lastTerm,
-			lastIndex
+			super.getId(),
+			lastEntry.getTerm(),
+			lastEntry.getIndex()
 		);
 	}
 
 	private void startElection() {
 
+		this.cancelElection();
+
 		state = NodeState.CANDIDATE;
+
+		++currentTerm;
 
 		// Vote for ourselves as the leader
 		votes = 1;
 
-		votedFor = this.getId();
+		votedFor = super.getId();
 
 		final VoteRequest request = buildVoteRequest();
 
@@ -287,7 +314,12 @@ public class LocalNode extends Node {
 					new VoteResponseAsyncHandler(request, this, peer)
 				);
 			} catch (Exception error) {
-				LOG.error("Unable to request vote from {} due to {}", peer.getId(), error);
+				LOG.error(
+					"Unable to request vote from {}/{} due to {}",
+					peer.getId(),
+					peer.getAddress(),
+					error
+				);
 			}
 		}
 	}
@@ -325,8 +357,9 @@ public class LocalNode extends Node {
 
 			if (response.getTerm() > currentTerm) {
 				LOG.debug(
-					"Stepping down as peer {} term {} does not match ours {}",
+					"Stepping down as peer {}/{} term {} does not match ours {}",
 					peer.getId(),
+					peer.getAddress(),
 					response.getTerm(),
 					currentTerm
 				);
@@ -343,8 +376,9 @@ public class LocalNode extends Node {
 
 			} else {
 				LOG.debug(
-					"Vote denied from {} theirs={},ours={}",
+					"Vote denied from {}/{} theirs={},ours={}",
 					peer.getId(),
+					peer.getAddress(),
 					response.getTerm(),
 					currentTerm
 				);
@@ -354,26 +388,114 @@ public class LocalNode extends Node {
 		}
 	}
 
+	private AppendEntriesRequest buildAppendEntryRequest() {
+
+		final LogEntry lastEntry = getLastLogEntry();
+
+		return new AppendEntriesRequest(
+			currentTerm,
+			super.getId(),
+			lastEntry.getIndex(),
+			lastEntry.getTerm(),
+			Collections.emptyList(),
+			commitIndex
+		);
+	}
+
 	private void emitHeartBeat() {
 
+		if (state != NodeState.LEADER) {
+			LOG.warn("Tried to emit heart beat when we are not the leader");
+			return;
+		}
+
+		LOG.debug("Sending heart beat...");
+
+		final AppendEntriesRequest request = buildAppendEntryRequest();
+
+		for (final RemoteNode node : peers.values()) {
+			try {
+				node.getClient().appendEntries(
+					request,
+					new AppendEntriesResponseAsyncHandler(request, this, node)
+				);
+			} catch (Exception error) {
+				LOG.warn("Unable to send append entries request to {} due to {}", node.getId(), error);
+			}
+		}
+	}
+
+	private boolean isValidAppendEntryResponse(
+		AppendEntriesRequest request,
+		AppendEntriesResponse response
+	) {
+		if (request.getTerm() != currentTerm) {
+			LOG.debug(
+				"Response is not for current term: {}/{}",
+				request.getTerm(),
+				currentTerm
+			);
+			return false;
+		}
+
+		if (state != NodeState.LEADER) {
+			LOG.debug(
+				"Response is ignored as we are no longer the leader"
+			);
+
+			return false;
+		}
+
+		return true;
+	}
+
+	public void onAppendEntryResponse(
+		AppendEntriesRequest request,
+		AppendEntriesResponse response,
+		RemoteNode peer
+	) {
+
+		if (!isValidAppendEntryResponse(request, response)) {
+			return;
+		}
+
+		if (request.getTerm() > currentTerm) {
+
+			LOG.debug(
+				"Stepping down from leader as {}/{} term {} is newer than ours {}",
+				peer.getId(),
+				peer.getAddress(),
+				response.getTerm(),
+				currentTerm
+			);
+
+			this.stepDown(request.getTerm());
+		}
 	}
 
 	private void becomeLeader() {
+		LOG.debug("Becoming leader...");
+
 		state = NodeState.LEADER;
 
 		votes = 0;
 
-		leaderId = this.getId();
+		leaderId = super.getId();
 
-		this.cancelElection();
+		// Send an initial empty heart beat to establish ourselves as the leader
+		emitHeartBeat();
 
-		this.scheduleHeartBeat();
+		cancelElection();
+
+		scheduleHeartBeat();
 	}
 
 	private void stepDown(long newTerm) {
 
 		if (currentTerm < newTerm) {
+
 			currentTerm = newTerm;
+
 			votedFor = -1;
 		}
 
@@ -386,15 +508,23 @@ public class LocalNode extends Node {
 		scheduleElection();
 	}
 
-	private Optional<LogEntry> getLastLogEntry() {
+	private LogEntry getLastLogEntry() {
 		final Map.Entry<Long, LogEntry> entry = logEntries.lastEntry();
-		if (entry == null) {
-			return Optional.empty();
-		}
-		return Optional.of(entry.getValue());
+
+		return entry == null ?
+			new LogEntry(0L, 0L, null) :
+			entry.getValue();
 	}
 
 	public long getCurrentTerm() {
 		return currentTerm;
+	}
+
+	@Override
+	public String toString() {
+		return "LocalNode{" +
+			"id=" + super.getId() +
+			", address=" + super.getAddress() +
+			'}';
 	}
 }

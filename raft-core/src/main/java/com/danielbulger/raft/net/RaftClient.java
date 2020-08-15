@@ -1,7 +1,9 @@
 
 package com.danielbulger.raft.net;
 
+import com.danielbulger.raft.async.AppendEntriesResponseAsyncHandler;
 import com.danielbulger.raft.async.VoteResponseAsyncHandler;
+import com.danielbulger.raft.rpc.AppendEntriesRequest;
 import com.danielbulger.raft.rpc.RaftConsensus;
 import com.danielbulger.raft.rpc.VoteRequest;
 import org.apache.thrift.async.TAsyncClientManager;
@@ -29,6 +31,16 @@ public class RaftClient {
 			new TAsyncClientManager(),
 			new TNonblockingSocket(address.getHostString(), address.getPort())
 		);
+	}
+
+	public void appendEntries(
+		AppendEntriesRequest request,
+		AppendEntriesResponseAsyncHandler handler
+	) throws Exception {
+
+		final RaftConsensus.AsyncClient client = newClient();
+
+		client.appendEntries(request, handler);
 	}
 
 	public void askForVote(VoteRequest request, VoteResponseAsyncHandler handler) throws Exception {

@@ -13,23 +13,19 @@ import org.slf4j.LoggerFactory;
 
 import java.net.InetSocketAddress;
 
-public class RaftServer {
+public class RaftServer implements Runnable {
 
 	private static final Logger LOG = LoggerFactory.getLogger(RaftServer.class);
 
 	private TServer server;
 
-	public void start(LocalNode node, InetSocketAddress address) throws TTransportException {
+	public RaftServer(LocalNode node) throws TTransportException {
 
 		if (node == null) {
 			throw new IllegalArgumentException("node must not be null");
 		}
 
-		if (address == null) {
-			throw new IllegalArgumentException("address must not be null");
-		}
-
-		final TNonblockingServerTransport transport = new TNonblockingServerSocket(address);
+		final TNonblockingServerTransport transport = new TNonblockingServerSocket(node.getAddress());
 
 		final TProcessor processor = new RaftConsensus.Processor<>(
 			new RaftConsensusService(node)
@@ -38,8 +34,12 @@ public class RaftServer {
 		this.server = new TNonblockingServer(
 			new TNonblockingServer.Args(transport).processor(processor)
 		);
+	}
 
-		LOG.debug("Starting server on {}", address);
+	@Override
+	public void run() {
+
+		LOG.debug("Starting server {}", server);
 
 		this.server.serve();
 	}
