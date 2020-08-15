@@ -10,6 +10,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.FileReader;
 import java.io.Reader;
+import java.net.URL;
 import java.util.Optional;
 import java.util.Scanner;
 import java.util.concurrent.Executors;
@@ -20,8 +21,6 @@ public class ElectionExample {
 
 	public static void main(final String[] args) throws Exception {
 
-		final Reader reader = new FileReader(ElectionExample.class.getClassLoader().getResource("config.json").getFile());
-
 		int localNodeId;
 
 		try (Scanner scanner = new Scanner(System.in)) {
@@ -30,7 +29,13 @@ public class ElectionExample {
 
 		LOG.info("Initialising with local node {}", localNodeId);
 
-		final RaftConfigParser parser = new JsonRaftConfigParser(localNodeId, reader);
+		final RaftConfigParser parser;
+
+		final URL url = ElectionExample.class.getClassLoader().getResource("config.json");
+
+		try (final Reader reader = new FileReader(url.getFile())) {
+			parser = new JsonRaftConfigParser(localNodeId, reader);
+		}
 
 		final Optional<NodeConfiguration> optional = parser.getLocalNode();
 
@@ -43,14 +48,14 @@ public class ElectionExample {
 		final LocalNode node = new LocalNode(
 			new EmptyStateMachine(),
 			optional.get(),
-			Executors.newScheduledThreadPool(Runtime.getRuntime().availableProcessors()),
+			Executors.newScheduledThreadPool(2),
 			parser.getPeers()
 		);
 
-		final Thread thread = new Thread(new RaftServer(node));
-
-		thread.start();
-
 		node.scheduleElection();
+
+		final RaftServer server = new RaftServer(node);
+
+		server.run();
 	}
 }

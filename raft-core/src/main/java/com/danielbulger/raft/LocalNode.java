@@ -67,6 +67,10 @@ public class LocalNode extends Node {
 			throw new IllegalArgumentException("No executor service");
 		}
 
+		if (peers == null || peers.isEmpty()) {
+			throw new IllegalArgumentException("No peers");
+		}
+
 		this.heartBeat = config.getHeartBeat();
 
 		this.heartBeatTimeout = config.getHeartBeatTimeout();
@@ -101,9 +105,10 @@ public class LocalNode extends Node {
 
 		LOG.debug("Scheduling heart beat...");
 
+		// Send an initial empty heart beat without delay to establish ourselves as the leader
 		heartBeatFuture = executorService.scheduleWithFixedDelay(
 			this::emitHeartBeat,
-			this.heartBeat,
+			0L,
 			this.heartBeat,
 			TimeUnit.MILLISECONDS
 		);
@@ -112,8 +117,6 @@ public class LocalNode extends Node {
 	public void scheduleElection() {
 
 		cancelElection();
-
-		LOG.debug("Scheduling Election...");
 
 		electionFuture = executorService.scheduleWithFixedDelay(
 			this::startElection,
@@ -459,7 +462,7 @@ public class LocalNode extends Node {
 			return;
 		}
 
-		if (request.getTerm() > currentTerm) {
+		if (response.getTerm() > currentTerm) {
 
 			LOG.debug(
 				"Stepping down from leader as {}/{} term {} is newer than ours {}",
@@ -482,8 +485,12 @@ public class LocalNode extends Node {
 
 		leaderId = super.getId();
 
-		// Send an initial empty heart beat to establish ourselves as the leader
-		emitHeartBeat();
+		for (final RemoteNode peer : peers.values()) {
+
+			peer.setMatchIndex(0);
+
+			peer.setNextIndex(getLastLogEntry().getIndex() + 1);
+		}
 
 		cancelElection();
 
