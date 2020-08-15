@@ -12,10 +12,7 @@ public class LocalNodeConfiguration {
 
 	private final long heartBeatTimeout;
 
-	public LocalNodeConfiguration(int id, InetSocketAddress address, long heartBeat, long heartBeatTimeout) {
-		if (address == null) {
-			throw new IllegalArgumentException("address is null");
-		}
+	public LocalNodeConfiguration(int id, String host, int port, long heartBeat, long heartBeatTimeout) {
 
 		if (heartBeat <= 0) {
 			throw new IllegalArgumentException("heart beat must be > 0 " + heartBeat);
@@ -26,7 +23,7 @@ public class LocalNodeConfiguration {
 		}
 
 		this.id = id;
-		this.address = address;
+		this.address = new InetSocketAddress(host, port);
 		this.heartBeatTimeout = heartBeatTimeout;
 		this.heartBeat = heartBeat;
 	}
