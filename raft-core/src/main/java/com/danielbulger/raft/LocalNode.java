@@ -197,6 +197,12 @@ public class LocalNode extends Node {
 			voteLock.unlock();
 		}
 
+		if(request.getEntriesSize() == 0) {
+			LOG.debug("Heartbeat received from {}", request.getLeaderId());
+
+			return true;
+		}
+
 		// Append any missing log entries
 		for (final LogEntry entry : request.getEntries()) {
 			if (!logEntries.containsKey(entry.getIndex())) {
