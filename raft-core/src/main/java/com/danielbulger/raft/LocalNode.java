@@ -197,8 +197,10 @@ public class LocalNode extends Node {
 			voteLock.unlock();
 		}
 
-		if(request.getEntriesSize() == 0) {
+		if (request.getEntriesSize() == 0) {
 			LOG.debug("Heartbeat received from {}", request.getLeaderId());
+
+			applyLogEntry(request);
 
 			return true;
 		}
@@ -209,6 +211,13 @@ public class LocalNode extends Node {
 				logEntries.put(entry.getIndex(), entry);
 			}
 		}
+
+		applyLogEntry(request);
+
+		return true;
+	}
+
+	private void applyLogEntry(AppendEntriesRequest request) {
 
 		if (request.getLeaderCommitIndex() > commitIndex) {
 			if (request.getEntries().isEmpty()) {
@@ -224,9 +233,32 @@ public class LocalNode extends Node {
 			}
 		}
 
-		LOG.debug("Applied entry from {}", request.getLeaderId());
+		if (lastAppliedEntry < commitIndex) {
 
-		return true;
+			for (long index = lastAppliedEntry + 1; index <= commitIndex; ++index) {
+
+				final LogEntry entry = logEntries.get(index);
+
+				if (entry == null) {
+					LOG.error("No log entry for index {}", index);
+					continue;
+				}
+
+				stateMachine.apply(entry.getData());
+
+				LOG.debug(
+					"Applied entry={}, leader={}, term={}, lastAppliedIndex={}",
+					index,
+					request.getLeaderId(),
+					currentTerm,
+					lastAppliedEntry
+				);
+
+				lastAppliedEntry = index;
+			}
+
+		}
+
 	}
 
 	public boolean voteFor(VoteRequest request) {
@@ -418,7 +450,7 @@ public class LocalNode extends Node {
 			return;
 		}
 
-		LOG.debug("Sending heart beat...");
+		LOG.debug("Sending heartbeat...");
 
 		final AppendEntriesRequest request = buildAppendEntryRequest();
 
