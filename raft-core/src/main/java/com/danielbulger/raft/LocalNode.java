@@ -16,6 +16,8 @@ import java.util.concurrent.locks.ReentrantLock;
 
 public class LocalNode extends Node {
 
+	private static final LogEntry EMPTY_LOG_ENTRY = new LogEntry(0L, 0L, null);
+
 	private static final Logger LOG = LoggerFactory.getLogger(LocalNode.class);
 
 	private NodeState state = NodeState.FOLLOWER;
@@ -547,9 +549,7 @@ public class LocalNode extends Node {
 	private LogEntry getLastLogEntry() {
 		final Map.Entry<Long, LogEntry> entry = logEntries.lastEntry();
 
-		return entry == null ?
-			new LogEntry(0L, 0L, null) :
-			entry.getValue();
+		return entry == null ? EMPTY_LOG_ENTRY : entry.getValue();
 	}
 
 	public long getCurrentTerm() {
