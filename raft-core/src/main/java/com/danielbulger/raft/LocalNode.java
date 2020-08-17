@@ -219,19 +219,10 @@ public class LocalNode extends Node {
 
 	private void applyLogEntry(AppendEntriesRequest request) {
 
-		if (request.getLeaderCommitIndex() > commitIndex) {
-			if (request.getEntries().isEmpty()) {
-				commitIndex = request.getLeaderCommitIndex();
-			} else {
-
-				final LogEntry lastEntry = request.getEntries().get(request.getEntriesSize() - 1);
-
-				commitIndex = Math.min(
-					request.getLeaderCommitIndex(),
-					lastEntry.getIndex()
-				);
-			}
-		}
+		commitIndex = Math.min(
+			request.getLeaderCommitIndex(),
+			request.getPrevLogIndex() + request.getEntriesSize()
+		);
 
 		if (lastAppliedEntry < commitIndex) {
 
