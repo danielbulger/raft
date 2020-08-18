@@ -21,7 +21,8 @@ struct AppendEntriesRequest {
 
 struct AppendEntriesResponse {
 	1: Term term;
-	2: bool success;
+	2: LogIndex lastLogIndex;
+	3: bool success;
 }
 
 struct VoteRequest {

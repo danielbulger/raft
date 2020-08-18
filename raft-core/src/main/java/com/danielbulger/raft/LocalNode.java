@@ -16,8 +16,6 @@ import java.util.concurrent.locks.ReentrantLock;
 
 public class LocalNode extends Node {
 
-	private static final LogEntry EMPTY_LOG_ENTRY = new LogEntry(0L, 0L, null);
-
 	private static final Logger LOG = LoggerFactory.getLogger(LocalNode.class);
 
 	private NodeState state = NodeState.FOLLOWER;
@@ -359,13 +357,16 @@ public class LocalNode extends Node {
 	}
 
 	private boolean isValidVoteResponse(
+		RemoteNode peer,
 		VoteRequest request,
 		VoteResponse response
 	) {
 
 		if (request.getTerm() != currentTerm) {
 			LOG.debug(
-				"Response is not for current term: {}/{}",
+				"Response from {}/{} is not for current term: {}/{}",
+				peer.getId(),
+				peer.getAddress(),
 				request.getTerm(),
 				currentTerm
 			);
@@ -374,7 +375,10 @@ public class LocalNode extends Node {
 
 		if (state != NodeState.CANDIDATE) {
 			LOG.debug(
-				"Response ignored as we are no longer a candidate"
+				"Response from {}/{} ignored as we are no longer a candidate term={}",
+				peer.getId(),
+				peer.getAddress(),
+				request.getTerm()
 			);
 			return false;
 		}
@@ -386,7 +390,7 @@ public class LocalNode extends Node {
 
 		voteLock.lock();
 
-		if (!isValidVoteResponse(request, response)) {
+		if (!isValidVoteResponse(peer, request, response)) {
 			return;
 		}
 
@@ -405,6 +409,13 @@ public class LocalNode extends Node {
 			}
 
 			if (response.isGranted()) {
+
+				LOG.debug(
+					"Received vote from {}/{} for term={}",
+					peer.getId(),
+					peer.getAddress(),
+					response.getTerm()
+				);
 
 				// if we now have enough votes to become the leader
 				if (++votes > peers.size() / 2) {
@@ -531,6 +542,27 @@ public class LocalNode extends Node {
 			);
 
 			this.stepDown(request.getTerm());
+		} else {
+
+			if (!response.isSuccess()) {
+				LOG.debug(
+					"Append Entry failed for {}/{} prev={term={},index={}}, term={}",
+					peer.getId(),
+					peer.getAddress(),
+					request.getPrevLogTerm(),
+					request.getPrevLogIndex(),
+					request.getTerm()
+				);
+				// If this wasn't a success we need to transfer from
+				// the last known index the client has on the next heartbeat
+				peer.setNextIndex(response.getLastLogIndex() + 1);
+				return;
+			}
+
+			peer.setMatchIndex(request.getPrevLogIndex() + request.getEntriesSize());
+
+			peer.setNextIndex(peer.getMatchIndex() + 1);
+
 		}
 	}
 
@@ -576,11 +608,15 @@ public class LocalNode extends Node {
 	private LogEntry getLastLogEntry() {
 		final Map.Entry<Long, LogEntry> entry = logEntries.lastEntry();
 
-		return entry == null ? EMPTY_LOG_ENTRY : entry.getValue();
+		return entry == null ? LogEntryFactory.emptyEntry() : entry.getValue();
 	}
 
 	public long getCurrentTerm() {
 		return currentTerm;
+	}
+
+	public long getLastLogIndex() {
+		return getLastLogEntry().getIndex();
 	}
 
 	@Override

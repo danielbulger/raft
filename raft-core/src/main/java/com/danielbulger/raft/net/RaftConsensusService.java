@@ -17,6 +17,7 @@ public class RaftConsensusService implements RaftConsensus.Iface, RaftConsensus.
 	public AppendEntriesResponse appendEntries(AppendEntriesRequest request) throws TException {
 		return new AppendEntriesResponse(
 			node.getCurrentTerm(),
+			node.getLastLogIndex(),
 			node.appendEntry(request)
 		);
 	}
