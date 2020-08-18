@@ -3,8 +3,8 @@ package com.danielbulger.raft.example;
 import com.danielbulger.raft.LocalNode;
 import com.danielbulger.raft.NodeConfiguration;
 import com.danielbulger.raft.net.RaftServer;
-import com.danielbulger.raft.util.JsonRaftConfigParser;
-import com.danielbulger.raft.util.RaftConfigParser;
+import com.danielbulger.raft.service.RaftConfigParser;
+import com.danielbulger.raft.service.RaftConfigParserProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -15,9 +15,9 @@ import java.util.Optional;
 import java.util.Scanner;
 import java.util.concurrent.Executors;
 
-public class ElectionExample {
+public class RaftExample {
 
-	private static final Logger LOG = LoggerFactory.getLogger(ElectionExample.class);
+	private static final Logger LOG = LoggerFactory.getLogger(RaftExample.class);
 
 	public static void main(final String[] args) throws Exception {
 
@@ -29,20 +29,20 @@ public class ElectionExample {
 
 		LOG.info("Initialising with local node {}", localNodeId);
 
-		final RaftConfigParser parser;
-
-		final URL url = ElectionExample.class.getClassLoader().getResource("config.json");
+		final URL url = RaftExample.class.getClassLoader().getResource("config.json");
 
 		if(url == null) {
 			LOG.error("No config file found");
 			System.exit(1);
 		}
 
+		final RaftConfigParser parser = RaftConfigParserProvider.service();
+
 		try (final Reader reader = new FileReader(url.getFile())) {
-			parser = new JsonRaftConfigParser(localNodeId, reader);
+			parser.load(reader);
 		}
 
-		final Optional<NodeConfiguration> optional = parser.getLocalNode();
+		final Optional<NodeConfiguration> optional = parser.getLocalNode(localNodeId);
 
 		if (optional.isEmpty()) {
 			LOG.error("No node with id {}", localNodeId);
@@ -54,10 +54,8 @@ public class ElectionExample {
 			new EmptyStateMachine(),
 			optional.get(),
 			Executors.newScheduledThreadPool(2),
-			parser.getPeers()
+			parser.getPeers(localNodeId)
 		);
-
-		node.scheduleElection();
 
 		final RaftServer server = new RaftServer(node);
 

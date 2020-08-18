@@ -1,7 +1,8 @@
-package com.danielbulger.raft.util;
+package com.danielbulger.raft.service.config;
 
 import com.danielbulger.raft.NodeConfiguration;
 import com.danielbulger.raft.RemoteNode;
+import com.danielbulger.raft.service.RaftConfigParser;
 import com.google.gson.Gson;
 
 import java.io.Reader;
@@ -10,27 +11,21 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
-public class JsonRaftConfigParser extends RaftConfigParser {
+public class JsonRaftConfigParser implements RaftConfigParser {
 
-	private final NodeConfiguration[] configs;
+	private NodeConfiguration[] configs;
 
-	public JsonRaftConfigParser(int localNodeId, Reader reader) throws Exception {
-		super(localNodeId);
-
-		this.configs = load(reader);
-	}
-
-	private NodeConfiguration[] load(Reader reader) throws Exception {
+	public void load(Reader reader) throws Exception {
 		final Gson gson = new Gson();
 
-		return gson.fromJson(
+		configs = gson.fromJson(
 			reader,
 			NodeConfiguration[].class
 		);
 	}
 
 	@Override
-	public Optional<NodeConfiguration> getLocalNode() {
+	public Optional<NodeConfiguration> getLocalNode(int localNodeId) {
 
 		for (final NodeConfiguration config : configs) {
 			if (config.getId() == localNodeId) {
@@ -42,7 +37,7 @@ public class JsonRaftConfigParser extends RaftConfigParser {
 	}
 
 	@Override
-	public Collection<RemoteNode> getPeers() {
+	public Collection<RemoteNode> getPeers(int localNodeId) {
 
 		final List<RemoteNode> nodes = new ArrayList<>(configs.length - 1);
 

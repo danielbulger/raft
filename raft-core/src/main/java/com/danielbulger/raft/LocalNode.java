@@ -3,6 +3,7 @@ package com.danielbulger.raft;
 import com.danielbulger.raft.async.AppendEntriesResponseAsyncHandler;
 import com.danielbulger.raft.async.VoteResponseAsyncHandler;
 import com.danielbulger.raft.rpc.*;
+import com.danielbulger.raft.service.LogPersistenceProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -142,6 +143,13 @@ public class LocalNode extends Node {
 		} while ((index = logEntries.higherKey(logIndex)) != null);
 	}
 
+	private void applyLogEntry(LogEntry entry) throws Exception {
+
+		LogPersistenceProvider.service().save(entry);
+
+		stateMachine.apply(entry.getData());
+	}
+
 	public boolean appendEntry(AppendEntriesRequest request) {
 
 		if (!peers.containsKey(request.getLeaderId())) {
@@ -223,7 +231,19 @@ public class LocalNode extends Node {
 				final LogEntry entry = logEntries.get(index);
 
 				if (entry != null) {
-					stateMachine.apply(entry.getData());
+					try {
+						applyLogEntry(entry);
+					} catch (Exception exception) {
+
+						// Don't try and go any further if we are unable to apply this update
+						LOG.error(
+							"Failed to apply log entry {} due to {}",
+							index,
+							exception.getMessage()
+						);
+
+						break;
+					}
 				}
 
 				lastAppliedEntry = index;
@@ -290,7 +310,16 @@ public class LocalNode extends Node {
 				continue;
 			}
 
-			stateMachine.apply(entry.getData());
+			try {
+				applyLogEntry(entry);
+			} catch (Exception exception) {
+				// Don't try and go any further if we are unable to apply this update
+				LOG.error(
+					"Failed to commit log entry {} due to {}",
+					index,
+					exception.getMessage()
+				);
+			}
 
 			lastAppliedEntry = index;
 

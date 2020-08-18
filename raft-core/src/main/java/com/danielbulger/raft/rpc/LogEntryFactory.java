@@ -10,6 +10,10 @@ public class LogEntryFactory {
 		return EMPTY_LOG_ENTRY;
 	}
 
+	public static LogEntry makeEntry(long term, long index, byte[] data) {
+		return new LogEntry(term, index, ByteBuffer.wrap(data));
+	}
+
 	public static LogEntry makeEntry(long term, long index, ByteBuffer data) {
 		return new LogEntry(term, index, data);
 	}

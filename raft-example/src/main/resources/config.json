@@ -4,27 +4,31 @@
 		"host": "127.0.0.1",
 		"port": 5500,
 		"heartBeat": 500,
-		"heartBeatTimeout": 4000
+		"heartBeatTimeout": 4000,
+		"storageFile": "/home/danielbulger/Workspace/raft/db/log1.sqlite3"
 	},
 	{
 		"id": 2,
 		"host": "127.0.0.1",
 		"port": 5501,
 		"heartBeat": 500,
-		"heartBeatTimeout": 5000
+		"heartBeatTimeout": 5000,
+		"storageFile": "/home/danielbulger/Workspace/raft/log2.sqlite3"
 	},
 	{
 		"id": 3,
 		"host": "127.0.0.1",
 		"port": 5502,
 		"heartBeat": 500,
-		"heartBeatTimeout": 6000
+		"heartBeatTimeout": 6000,
+		"storageFile": "/home/danielbulger/Workspace/raft/log3.sqlite3"
 	},
 	{
 		"id": 4,
 		"host": "127.0.0.1",
 		"port": 5503,
 		"heartBeat": 500,
-		"heartBeatTimeout": 7000
+		"heartBeatTimeout": 7000,
+		"storageFile": "/home/danielbulger/Workspace/raft/log4.sqlite3"
 	}
 ]

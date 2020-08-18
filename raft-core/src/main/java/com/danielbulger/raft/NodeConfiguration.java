@@ -14,7 +14,16 @@ public class NodeConfiguration {
 
 	private final long heartBeatTimeout;
 
-	public NodeConfiguration(int id, String host, int port, long heartBeat, long heartBeatTimeout) {
+	private final String storageFile;
+
+	public NodeConfiguration(
+		int id,
+		String host,
+		int port,
+		long heartBeat,
+		long heartBeatTimeout,
+		String storageFile
+	) {
 
 		if (heartBeat <= 0) {
 			throw new IllegalArgumentException("heart beat must be > 0 " + heartBeat);
@@ -29,6 +38,7 @@ public class NodeConfiguration {
 		this.heartBeat = heartBeat;
 		this.host = host;
 		this.port = port;
+		this.storageFile = storageFile;
 	}
 
 
@@ -46,6 +56,10 @@ public class NodeConfiguration {
 
 	public long getHeartBeatTimeout() {
 		return heartBeatTimeout;
+	}
+
+	public String getStorageFile() {
+		return storageFile;
 	}
 
 	@Override
