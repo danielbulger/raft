@@ -13,6 +13,7 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.stream.Collectors;
 
 public class LocalNode extends Node {
 
@@ -200,8 +201,6 @@ public class LocalNode extends Node {
 		if (request.getEntriesSize() == 0) {
 			LOG.debug("Heartbeat received from {}", request.getLeaderId());
 
-			applyLogEntry(request);
-
 			return true;
 		}
 
@@ -211,13 +210,6 @@ public class LocalNode extends Node {
 				logEntries.put(entry.getIndex(), entry);
 			}
 		}
-
-		applyLogEntry(request);
-
-		return true;
-	}
-
-	private void applyLogEntry(AppendEntriesRequest request) {
 
 		commitIndex = Math.min(
 			request.getLeaderCommitIndex(),
@@ -230,24 +222,84 @@ public class LocalNode extends Node {
 
 				final LogEntry entry = logEntries.get(index);
 
-				if (entry == null) {
-					LOG.error("No log entry for index {}", index);
-					continue;
+				if (entry != null) {
+					stateMachine.apply(entry.getData());
 				}
 
-				stateMachine.apply(entry.getData());
+				lastAppliedEntry = index;
 
 				LOG.debug(
-					"Applied entry={}, leader={}, term={}, lastAppliedIndex={}",
-					index,
+					"Appending from leader={}, entry={}, term={}, lastAppliedIndex={}",
 					request.getLeaderId(),
+					index,
 					currentTerm,
 					lastAppliedEntry
 				);
+			}
+		}
 
-				lastAppliedEntry = index;
+		return true;
+	}
+
+	private long getMedianIndex() {
+
+		final List<Long> indexes = peers.values()
+			.stream()
+			.mapToLong(RemoteNode::getMatchIndex)
+			.boxed()
+			.sorted(Comparator.reverseOrder())
+			.collect(Collectors.toList());
+
+		return indexes.get(indexes.size() / 2);
+	}
+
+	private void applyNextEntry() {
+
+		/*
+		As described by the White Paper on Page 4
+		If there exists an N such that N > commitIndex, a majority
+			of matchIndex[i] ≥ N, and log[N].term == currentTerm:
+			set commitIndex = N
+
+		To do this, we find the median index and if this is > the commit index
+		we know that the majority of the peers are greater than the
+		commit index.
+		 */
+		final long newCommitIndex = getMedianIndex();
+
+		if (commitIndex >= newCommitIndex) {
+			return;
+		}
+
+		final LogEntry commitEntry = logEntries.get(newCommitIndex);
+
+		if (commitEntry == null || commitEntry.getTerm() != currentTerm) {
+			return;
+		}
+
+		final long oldCommitIndex = commitIndex;
+
+		commitIndex = newCommitIndex;
+
+		for (long index = oldCommitIndex + 1; index <= commitIndex; ++index) {
+
+			final LogEntry entry = logEntries.get(index);
+
+			if (entry == null) {
+				LOG.error("No log entry for index {}", index);
+				continue;
 			}
 
+			stateMachine.apply(entry.getData());
+
+			lastAppliedEntry = index;
+
+			LOG.debug(
+				"Committing entry={}, term={}, lastAppliedIndex={}",
+				index,
+				currentTerm,
+				lastAppliedEntry
+			);
 		}
 
 	}
@@ -477,7 +529,6 @@ public class LocalNode extends Node {
 
 		LOG.debug("Sending heartbeat...");
 
-
 		for (final RemoteNode node : peers.values()) {
 			try {
 				final AppendEntriesRequest request = buildAppendEntryRequest(node);
@@ -562,6 +613,8 @@ public class LocalNode extends Node {
 			peer.setMatchIndex(request.getPrevLogIndex() + request.getEntriesSize());
 
 			peer.setNextIndex(peer.getMatchIndex() + 1);
+
+			applyNextEntry();
 
 		}
 	}
