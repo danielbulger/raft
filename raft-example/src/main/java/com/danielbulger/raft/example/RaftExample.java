@@ -3,6 +3,7 @@ package com.danielbulger.raft.example;
 import com.danielbulger.raft.LocalNode;
 import com.danielbulger.raft.NodeConfiguration;
 import com.danielbulger.raft.net.RaftServer;
+import com.danielbulger.raft.service.LogPersistenceProvider;
 import com.danielbulger.raft.service.RaftConfigParser;
 import com.danielbulger.raft.service.RaftConfigParserProvider;
 import org.slf4j.Logger;
@@ -31,7 +32,7 @@ public class RaftExample {
 
 		final URL url = RaftExample.class.getClassLoader().getResource("config.json");
 
-		if(url == null) {
+		if (url == null) {
 			LOG.error("No config file found");
 			System.exit(1);
 		}
@@ -49,6 +50,8 @@ public class RaftExample {
 
 			System.exit(1);
 		}
+
+		LogPersistenceProvider.service().initialise(optional.get());
 
 		final LocalNode node = new LocalNode(
 			new EmptyStateMachine(),

@@ -82,6 +82,8 @@ public class LocalNode extends Node {
 		this.executorService = executorService;
 
 		this.addPeers(peers);
+
+		this.scheduleElection();
 	}
 
 	private void cancelHeartBeat() {
