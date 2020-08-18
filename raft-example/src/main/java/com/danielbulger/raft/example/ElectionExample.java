@@ -33,6 +33,11 @@ public class ElectionExample {
 
 		final URL url = ElectionExample.class.getClassLoader().getResource("config.json");
 
+		if(url == null) {
+			LOG.error("No config file found");
+			System.exit(1);
+		}
+
 		try (final Reader reader = new FileReader(url.getFile())) {
 			parser = new JsonRaftConfigParser(localNodeId, reader);
 		}

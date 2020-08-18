@@ -25,6 +25,10 @@ public class RemoteNode extends Node {
 		return client;
 	}
 
+	public long getPrevIndex() {
+		return nextIndex - 1;
+	}
+
 	public long getNextIndex() {
 		return nextIndex;
 	}

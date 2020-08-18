@@ -358,7 +358,10 @@ public class LocalNode extends Node {
 		}
 	}
 
-	private boolean isValidVoteResponse(VoteRequest request, VoteResponse response) {
+	private boolean isValidVoteResponse(
+		VoteRequest request,
+		VoteResponse response
+	) {
 
 		if (request.getTerm() != currentTerm) {
 			LOG.debug(
@@ -422,18 +425,36 @@ public class LocalNode extends Node {
 		}
 	}
 
-	private AppendEntriesRequest buildAppendEntryRequest() {
+	private AppendEntriesRequest buildAppendEntryRequest(final RemoteNode peer) {
 
-		final LogEntry lastEntry = getLastLogEntry();
+		final long prevLogIndex = peer.getPrevIndex();
+
+		final LogEntry entry = logEntries.get(prevLogIndex);
+
+		final long prevLogTerm = entry != null ? entry.getTerm() : 0L;
+
+		final List<LogEntry> entries = getLogEntriesSinceIndex(peer.getNextIndex());
 
 		return new AppendEntriesRequest(
 			currentTerm,
 			super.getId(),
-			lastEntry.getIndex(),
-			lastEntry.getTerm(),
-			Collections.emptyList(),
-			commitIndex
+			prevLogIndex,
+			prevLogTerm,
+			entries,
+			Math.min(commitIndex, prevLogIndex + entries.size())
 		);
+	}
+
+	private List<LogEntry> getLogEntriesSinceIndex(long index) {
+		final LogEntry lastEntry = getLastLogEntry();
+
+		final List<LogEntry> entries = new ArrayList<>();
+
+		for (long i = index; i <= lastEntry.getIndex(); ++i) {
+			entries.add(logEntries.get(i));
+		}
+
+		return entries;
 	}
 
 	private void emitHeartBeat() {
@@ -445,16 +466,22 @@ public class LocalNode extends Node {
 
 		LOG.debug("Sending heartbeat...");
 
-		final AppendEntriesRequest request = buildAppendEntryRequest();
 
 		for (final RemoteNode node : peers.values()) {
 			try {
+				final AppendEntriesRequest request = buildAppendEntryRequest(node);
+
 				node.getClient().appendEntries(
 					request,
 					new AppendEntriesResponseAsyncHandler(request, this, node)
 				);
 			} catch (Exception error) {
-				LOG.warn("Unable to send append entries request to {} due to {}", node.getId(), error);
+				LOG.warn(
+					"Unable to send append entries request to {}/{} due to {}",
+					node.getId(),
+					node.getAddress(),
+					error.getMessage()
+				);
 			}
 		}
 	}
