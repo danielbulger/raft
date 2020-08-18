@@ -6,7 +6,7 @@ import java.util.ServiceLoader;
 
 public class RaftConfigParserProvider {
 
-	private static ServiceLoader<RaftConfigParser> serviceLoader = ServiceLoader.load(RaftConfigParser.class);
+	private static final ServiceLoader<RaftConfigParser> serviceLoader = ServiceLoader.load(RaftConfigParser.class);
 
 	public static RaftConfigParser service() {
 		final Optional<RaftConfigParser> persistence = serviceLoader.findFirst();

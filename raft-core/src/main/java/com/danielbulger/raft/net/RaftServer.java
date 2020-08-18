@@ -11,8 +11,6 @@ import org.apache.thrift.transport.TTransportException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.net.InetSocketAddress;
-
 public class RaftServer implements Runnable {
 
 	private static final Logger LOG = LoggerFactory.getLogger(RaftServer.class);

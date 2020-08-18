@@ -1,16 +1,15 @@
 
 package com.danielbulger.raft.net;
 
-import com.danielbulger.raft.async.AppendEntriesResponseAsyncHandler;
 import com.danielbulger.raft.async.VoteResponseAsyncHandler;
-import com.danielbulger.raft.rpc.AppendEntriesRequest;
-import com.danielbulger.raft.rpc.RaftConsensus;
-import com.danielbulger.raft.rpc.VoteRequest;
+import com.danielbulger.raft.rpc.*;
+import org.apache.thrift.async.AsyncMethodCallback;
 import org.apache.thrift.async.TAsyncClientManager;
 import org.apache.thrift.protocol.TBinaryProtocol;
 import org.apache.thrift.transport.TNonblockingSocket;
 
 import java.net.InetSocketAddress;
+import java.nio.ByteBuffer;
 
 public class RaftClient {
 
@@ -35,7 +34,7 @@ public class RaftClient {
 
 	public void appendEntries(
 		AppendEntriesRequest request,
-		AppendEntriesResponseAsyncHandler handler
+		AsyncMethodCallback<AppendEntriesResponse> handler
 	) throws Exception {
 
 		final RaftConsensus.AsyncClient client = newClient();
@@ -48,5 +47,20 @@ public class RaftClient {
 		final RaftConsensus.AsyncClient client = newClient();
 
 		client.vote(request, handler);
+	}
+
+	public void whoIsLeader(AsyncMethodCallback<Integer> callback) throws Exception {
+		final RaftConsensus.AsyncClient client = newClient();
+
+		client.whoIsLeader(callback);
+	}
+
+	public void updateData(
+		byte[] data,
+		AsyncMethodCallback<UpdateDataResponse> callback
+	) throws Exception {
+		final RaftConsensus.AsyncClient client = newClient();
+
+		client.updateData(ByteBuffer.wrap(data), callback);
 	}
 }

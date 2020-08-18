@@ -3,9 +3,14 @@ package com.danielbulger.raft.net;
 import com.danielbulger.raft.LocalNode;
 import com.danielbulger.raft.rpc.*;
 import org.apache.thrift.TException;
-import org.apache.thrift.async.AsyncMethodCallback;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-public class RaftConsensusService implements RaftConsensus.Iface, RaftConsensus.AsyncIface {
+import java.nio.ByteBuffer;
+
+public class RaftConsensusService implements RaftConsensus.Iface {
+
+	private static final Logger LOG = LoggerFactory.getLogger(RaftConsensusService.class.getName());
 
 	private final LocalNode node;
 
@@ -36,34 +41,25 @@ public class RaftConsensusService implements RaftConsensus.Iface, RaftConsensus.
 	}
 
 	@Override
-	public void appendEntries(
-		AppendEntriesRequest request,
-		AsyncMethodCallback<AppendEntriesResponse> resultHandler
-	) {
-		try {
-			resultHandler.onComplete(this.appendEntries(request));
-		} catch (Exception error) {
-			resultHandler.onError(error);
+	public int whoIsLeader() throws TException {
+		return node.getLeaderId();
+	}
+
+	@Override
+	public UpdateDataResponse updateData(ByteBuffer data) throws TException {
+
+		// If we are not the leader, direct the client to who
+		// we think the current leader is.
+		if (!node.isLeader()) {
+			return new UpdateDataResponse(false, node.getLeaderId());
 		}
-	}
 
-	@Override
-	public void installSnapshot(
-		InstallSnapshot snapshot,
-		AsyncMethodCallback<InstallSnapshotResponse> resultHandler
-	) throws TException {
-
-	}
-
-	@Override
-	public void vote(
-		VoteRequest request,
-		AsyncMethodCallback<VoteResponse> resultHandler
-	) {
 		try {
-			resultHandler.onComplete(this.vote(request));
-		} catch (Exception error) {
-			resultHandler.onError(error);
+			node.replicate(data.array());
+			return new UpdateDataResponse(true, 0);
+		} catch (Exception exception) {
+			LOG.error("Failed to replicate message", exception);
+			return new UpdateDataResponse(false, 0);
 		}
 	}
 }

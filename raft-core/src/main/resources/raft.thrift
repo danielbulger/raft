@@ -4,6 +4,8 @@ typedef i64 Term
 
 typedef i64 LogIndex
 
+typedef i32 LeaderId
+
 struct LogEntry {
 	1: Term term;
 	2: LogIndex index;
@@ -12,7 +14,7 @@ struct LogEntry {
 
 struct AppendEntriesRequest {
 	1: Term term;
-	2: i32 leaderId;
+	2: LeaderId leaderId;
 	3: LogIndex prevLogIndex;
 	4: Term prevLogTerm;
 	5: list<LogEntry> entries;
@@ -51,6 +53,11 @@ struct InstallSnapshotResponse {
 	1: Term term;
 }
 
+struct UpdateDataResponse {
+	1: bool success;
+	2: LeaderId leaderId;
+}
+
 service RaftConsensus {
 
 	AppendEntriesResponse appendEntries(1: AppendEntriesRequest request),
@@ -58,4 +65,8 @@ service RaftConsensus {
 	InstallSnapshotResponse installSnapshot(1: InstallSnapshot snapshot),
 
 	VoteResponse vote(1: VoteRequest request)
+
+	LeaderId whoIsLeader();
+
+	UpdateDataResponse updateData(1: binary data);
 }

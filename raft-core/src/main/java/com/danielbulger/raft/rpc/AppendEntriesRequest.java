@@ -114,7 +114,7 @@ public class AppendEntriesRequest implements org.apache.thrift.TBase<AppendEntri
     tmpMap.put(_Fields.TERM, new org.apache.thrift.meta_data.FieldMetaData("term", org.apache.thrift.TFieldRequirementType.DEFAULT, 
         new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.I64        , "Term")));
     tmpMap.put(_Fields.LEADER_ID, new org.apache.thrift.meta_data.FieldMetaData("leaderId", org.apache.thrift.TFieldRequirementType.DEFAULT, 
-        new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.I32)));
+        new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.I32        , "LeaderId")));
     tmpMap.put(_Fields.PREV_LOG_INDEX, new org.apache.thrift.meta_data.FieldMetaData("prevLogIndex", org.apache.thrift.TFieldRequirementType.DEFAULT, 
         new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.I64        , "LogIndex")));
     tmpMap.put(_Fields.PREV_LOG_TERM, new org.apache.thrift.meta_data.FieldMetaData("prevLogTerm", org.apache.thrift.TFieldRequirementType.DEFAULT, 

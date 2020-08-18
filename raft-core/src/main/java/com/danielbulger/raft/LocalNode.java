@@ -86,6 +86,33 @@ public class LocalNode extends Node {
 		this.scheduleElection();
 	}
 
+	public void replicate(byte[] data) throws Exception {
+
+		if (!isLeader()) {
+			throw new Exception("replicate called on non-leader");
+		}
+
+		final long nextIndex = logEntries.isEmpty() ? 1 : logEntries.lastKey() + 1;
+
+		logEntries.put(nextIndex, LogEntryFactory.makeEntry(
+			currentTerm, nextIndex, data
+		));
+
+		for (final RemoteNode peer : peers.values()) {
+			try {
+				sendAppendRequest(peer);
+			} catch (Exception exception) {
+
+				LOG.error(
+					"Unable to send replicate request to {}/{} due to {}",
+					peer.getId(),
+					peer.getAddress(),
+					exception.getMessage()
+				);
+			}
+		}
+	}
+
 	private void cancelHeartBeat() {
 		if (heartBeatFuture != null && !heartBeatFuture.isDone()) {
 			heartBeatFuture.cancel(true);
@@ -118,7 +145,7 @@ public class LocalNode extends Node {
 		);
 	}
 
-	public void scheduleElection() {
+	private void scheduleElection() {
 
 		cancelElection();
 
@@ -130,7 +157,7 @@ public class LocalNode extends Node {
 		);
 	}
 
-	public void addPeers(Collection<RemoteNode> nodes) {
+	private void addPeers(Collection<RemoteNode> nodes) {
 		for (final RemoteNode peer : nodes) {
 			if (peer != null) {
 				peers.put(peer.getId(), peer);
@@ -235,6 +262,17 @@ public class LocalNode extends Node {
 				if (entry != null) {
 					try {
 						applyLogEntry(entry);
+
+						lastAppliedEntry = index;
+
+						LOG.debug(
+							"Appending from leader={}, entry={}, term={}, lastAppliedIndex={}",
+							request.getLeaderId(),
+							index,
+							currentTerm,
+							lastAppliedEntry
+						);
+
 					} catch (Exception exception) {
 
 						// Don't try and go any further if we are unable to apply this update
@@ -247,16 +285,6 @@ public class LocalNode extends Node {
 						break;
 					}
 				}
-
-				lastAppliedEntry = index;
-
-				LOG.debug(
-					"Appending from leader={}, entry={}, term={}, lastAppliedIndex={}",
-					request.getLeaderId(),
-					index,
-					currentTerm,
-					lastAppliedEntry
-				);
 			}
 		}
 
@@ -290,12 +318,22 @@ public class LocalNode extends Node {
 		final long newCommitIndex = getMedianIndex();
 
 		if (commitIndex >= newCommitIndex) {
+			LOG.debug(
+				"Not applying log entry as commit={} is above new commit={}",
+				commitIndex,
+				newCommitIndex
+			);
 			return;
 		}
 
 		final LogEntry commitEntry = logEntries.get(newCommitIndex);
 
-		if (commitEntry == null || commitEntry.getTerm() != currentTerm) {
+		if (commitEntry != null && commitEntry.getTerm() != currentTerm) {
+			LOG.debug(
+				"Not applying log entry as commit entry term does not match entry={}, ours={}",
+				commitEntry.getTerm(),
+				currentTerm
+			);
 			return;
 		}
 
@@ -314,6 +352,16 @@ public class LocalNode extends Node {
 
 			try {
 				applyLogEntry(entry);
+
+				lastAppliedEntry = index;
+
+				LOG.debug(
+					"Committing entry={}, term={}, lastAppliedIndex={}",
+					index,
+					currentTerm,
+					lastAppliedEntry
+				);
+
 			} catch (Exception exception) {
 				// Don't try and go any further if we are unable to apply this update
 				LOG.error(
@@ -321,16 +369,9 @@ public class LocalNode extends Node {
 					index,
 					exception.getMessage()
 				);
+
+				break;
 			}
-
-			lastAppliedEntry = index;
-
-			LOG.debug(
-				"Committing entry={}, term={}, lastAppliedIndex={}",
-				index,
-				currentTerm,
-				lastAppliedEntry
-			);
 		}
 
 	}
@@ -562,12 +603,7 @@ public class LocalNode extends Node {
 
 		for (final RemoteNode node : peers.values()) {
 			try {
-				final AppendEntriesRequest request = buildAppendEntryRequest(node);
-
-				node.getClient().appendEntries(
-					request,
-					new AppendEntriesResponseAsyncHandler(request, this, node)
-				);
+				sendAppendRequest(node);
 			} catch (Exception error) {
 				LOG.warn(
 					"Unable to send append entries request to {}/{} due to {}",
@@ -635,9 +671,11 @@ public class LocalNode extends Node {
 					request.getPrevLogIndex(),
 					request.getTerm()
 				);
+
 				// If this wasn't a success we need to transfer from
 				// the last known index the client has on the next heartbeat
 				peer.setNextIndex(response.getLastLogIndex() + 1);
+
 				return;
 			}
 
@@ -689,6 +727,16 @@ public class LocalNode extends Node {
 		scheduleElection();
 	}
 
+	private void sendAppendRequest(RemoteNode peer) throws Exception {
+		final AppendEntriesRequest request = buildAppendEntryRequest(peer);
+
+		peer.getClient().appendEntries(
+			request,
+
+			new AppendEntriesResponseAsyncHandler(request, this, peer)
+		);
+	}
+
 	private LogEntry getLastLogEntry() {
 		final Map.Entry<Long, LogEntry> entry = logEntries.lastEntry();
 
@@ -701,6 +749,14 @@ public class LocalNode extends Node {
 
 	public long getLastLogIndex() {
 		return getLastLogEntry().getIndex();
+	}
+
+	public int getLeaderId() {
+		return leaderId;
+	}
+
+	public boolean isLeader() {
+		return state == NodeState.LEADER;
 	}
 
 	@Override

@@ -7,7 +7,7 @@ import com.danielbulger.raft.service.LogPersistence;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.net.URL;
+import java.io.File;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -29,15 +29,15 @@ public class Sqlite3LogPersistence implements LogPersistence {
 
 	private Connection connect() throws Exception {
 
-		final URL url = getClass().getClassLoader().getResource(database);
+		final File file = new File(database);
 
-		if (url == null) {
-			throw new Exception("Unable to find log database");
+		if(!file.exists()) {
+			throw new Exception("Unable to find log database at " + database);
 		}
 
-		final Connection connection = DriverManager.getConnection("jdbc:sqlite:" + url.getFile());
+		final Connection connection = DriverManager.getConnection("jdbc:sqlite:" + file.getAbsolutePath());
 
-		System.out.println(url.getFile());
+		connection.setAutoCommit(false);
 
 		return connection;
 	}
