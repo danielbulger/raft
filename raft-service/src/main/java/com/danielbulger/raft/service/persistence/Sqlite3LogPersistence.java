@@ -3,6 +3,7 @@ package com.danielbulger.raft.service.persistence;
 import com.danielbulger.raft.NodeConfiguration;
 import com.danielbulger.raft.rpc.LogEntry;
 import com.danielbulger.raft.rpc.LogEntryFactory;
+import com.danielbulger.raft.rpc.MetaData;
 import com.danielbulger.raft.service.LogPersistence;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,7 +32,7 @@ public class Sqlite3LogPersistence implements LogPersistence {
 
 		final File file = new File(database);
 
-		if(!file.exists()) {
+		if (!file.exists()) {
 			throw new Exception("Unable to find log database at " + database);
 		}
 
@@ -153,4 +154,57 @@ public class Sqlite3LogPersistence implements LogPersistence {
 			}
 		}
 	}
+
+	@Override
+	public void updateMetaData(MetaData metaData) throws Exception {
+
+		final String sql = "INSERT INTO metaData(currentTerm, votedFor) VALUES(?, ?)";
+
+		try (final Connection connection = connect()) {
+
+			try (final PreparedStatement stmt = connection.prepareStatement(sql)) {
+
+				stmt.setLong(1, metaData.getCurrentTerm());
+
+				stmt.setInt(2, metaData.getVotedFor());
+
+				stmt.executeUpdate();
+
+				connection.commit();
+
+			} catch (Exception exception) {
+				connection.rollback();
+
+				throw exception;
+			}
+		}
+
+	}
+
+	@Override
+	public Optional<MetaData> getLatestMetaData() {
+
+		final String sql = "SELECT currentTerm, votedFor FROM metaData ORDER BY id DESC LIMIT 1";
+
+		try (final Connection connection = connect();
+			 final PreparedStatement stmt = connection.prepareStatement(sql)) {
+
+			final ResultSet rs = stmt.executeQuery();
+
+			if (rs.next()) {
+
+				final long term = rs.getLong(1);
+
+				final int votedFor = rs.getInt(2);
+
+				return Optional.of(new MetaData(term, votedFor));
+			}
+
+		} catch (Exception exception) {
+			LOG.error("Unable to fetch latest metaData", exception);
+		}
+
+		return Optional.empty();
+	}
+
 }

@@ -6,6 +6,11 @@ typedef i64 LogIndex
 
 typedef i32 LeaderId
 
+struct MetaData {
+	1: Term currentTerm;
+	2: LeaderId votedFor;
+}
+
 struct LogEntry {
 	1: Term term;
 	2: LogIndex index;

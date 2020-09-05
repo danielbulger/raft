@@ -3,6 +3,8 @@ package com.danielbulger.raft;
 import com.danielbulger.raft.async.AppendEntriesResponseAsyncHandler;
 import com.danielbulger.raft.async.VoteResponseAsyncHandler;
 import com.danielbulger.raft.rpc.*;
+import com.danielbulger.raft.rpc.MetaData;
+import com.danielbulger.raft.service.LogPersistence;
 import com.danielbulger.raft.service.LogPersistenceProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -81,9 +83,34 @@ public class LocalNode extends Node {
 
 		this.executorService = executorService;
 
+		this.readFromMetaData();
+
 		this.addPeers(peers);
 
 		this.scheduleElection();
+	}
+
+	private void readFromMetaData() {
+
+		final LogPersistence persistence = LogPersistenceProvider.service();
+
+		final Optional<MetaData> optionalMetaData = persistence.getLatestMetaData();
+
+		if(optionalMetaData.isEmpty()) {
+			return;
+		}
+
+		this.currentTerm = optionalMetaData.get().getCurrentTerm();
+
+		this.votedFor = optionalMetaData.get().getVotedFor();
+
+		LOG.debug("Loaded metaData currentTerm={}, votedFor={}", currentTerm, votedFor);
+
+		final Collection<LogEntry> logs = persistence.getAll();
+
+		for(final LogEntry entry : logs) {
+			logEntries.put(entry.getIndex(), entry);
+		}
 	}
 
 	public void replicate(byte[] data) throws Exception {
@@ -168,7 +195,14 @@ public class LocalNode extends Node {
 	private void deleteNewerEntries(long logIndex) {
 		Long index = logIndex;
 		do {
-			logEntries.remove(index);
+			try {
+				LogPersistenceProvider.service().delete(logEntries.get(index));
+
+				logEntries.remove(index);
+			} catch (Exception error) {
+				LOG.error("Unable to delete entry {}", index);
+			}
+
 		} while ((index = logEntries.higherKey(logIndex)) != null);
 	}
 
@@ -224,6 +258,7 @@ public class LocalNode extends Node {
 					request.getLeaderId(),
 					peers.get(request.getLeaderId()).getAddress()
 				);
+
 				stepDown(request.getTerm());
 			}
 
@@ -252,6 +287,8 @@ public class LocalNode extends Node {
 			request.getLeaderCommitIndex(),
 			request.getPrevLogIndex() + request.getEntriesSize()
 		);
+
+		updateLatestMetaData();
 
 		if (lastAppliedEntry < commitIndex) {
 
@@ -341,6 +378,8 @@ public class LocalNode extends Node {
 
 		commitIndex = newCommitIndex;
 
+		updateLatestMetaData();
+
 		for (long index = oldCommitIndex + 1; index <= commitIndex; ++index) {
 
 			final LogEntry entry = logEntries.get(index);
@@ -410,6 +449,8 @@ public class LocalNode extends Node {
 
 			votedFor = request.getCandidateId();
 
+			this.updateLatestMetaData();
+
 			LOG.debug(
 				"Granting vote for {} as they are up to date",
 				request.getCandidateId()
@@ -420,6 +461,8 @@ public class LocalNode extends Node {
 		if (logEntry.getTerm() <= request.getLastLogTerm() && logEntry.getIndex() <= request.getLastLogIndex()) {
 
 			votedFor = request.getCandidateId();
+
+			this.updateLatestMetaData();
 
 			LOG.debug("Granting vote for {} as they are up to date",
 				request.getCandidateId()
@@ -460,6 +503,8 @@ public class LocalNode extends Node {
 		votes = 1;
 
 		votedFor = super.getId();
+
+		this.updateLatestMetaData();
 
 		final VoteRequest request = buildVoteRequest();
 
@@ -528,7 +573,9 @@ public class LocalNode extends Node {
 					response.getTerm(),
 					currentTerm
 				);
+
 				stepDown(response.getTerm());
+
 				return;
 			}
 
@@ -716,6 +763,8 @@ public class LocalNode extends Node {
 			currentTerm = newTerm;
 
 			votedFor = -1;
+
+			updateLatestMetaData();
 		}
 
 		votes = 0;
@@ -725,6 +774,16 @@ public class LocalNode extends Node {
 		cancelHeartBeat();
 
 		scheduleElection();
+	}
+
+	private void updateLatestMetaData() {
+		try {
+			LogPersistenceProvider.service().updateMetaData(new MetaData(currentTerm, votedFor));
+		} catch (Exception exception) {
+			LOG.error("Unable to update the meta data", exception);
+			// Not sure what the best error handling is for this, if we can't update
+			// the meta data log.
+		}
 	}
 
 	private void sendAppendRequest(RemoteNode peer) throws Exception {
