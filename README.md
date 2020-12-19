@@ -2,8 +2,7 @@
 
 This is a toy Java implementation of the [Raft Consensus](https://raft.github.io/raft.pdf).
 
-Currently unimplemented features
-* Election timeout and restarting the election process
+Unimplemented features
 * Snapshots
 * Automated tests
 

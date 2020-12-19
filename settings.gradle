@@ -3,5 +3,3 @@ rootProject.name = 'raft'
 include 'raft-core'
 
 include 'raft-service'
-
-include 'raft-example'

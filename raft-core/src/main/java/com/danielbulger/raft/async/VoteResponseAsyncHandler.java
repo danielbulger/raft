@@ -39,7 +39,7 @@ public class VoteResponseAsyncHandler implements AsyncMethodCallback<VoteRespons
 
 	@Override
 	public void onComplete(VoteResponse response) {
-		node.onVoteResponse(request, response, peer);
+		node.handleVoteResponse(request, response, peer);
 	}
 
 	@Override

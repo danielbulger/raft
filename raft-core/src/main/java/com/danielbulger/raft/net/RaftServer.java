@@ -1,6 +1,7 @@
 package com.danielbulger.raft.net;
 
 import com.danielbulger.raft.LocalNode;
+import com.danielbulger.raft.NodeLog;
 import com.danielbulger.raft.rpc.RaftConsensus;
 import org.apache.thrift.TProcessor;
 import org.apache.thrift.server.TNonblockingServer;
@@ -15,9 +16,9 @@ public class RaftServer implements Runnable {
 
 	private static final Logger LOG = LoggerFactory.getLogger(RaftServer.class);
 
-	private TServer server;
+	private final TServer server;
 
-	public RaftServer(LocalNode node) throws TTransportException {
+	public RaftServer(LocalNode node, NodeLog log) throws TTransportException {
 
 		if (node == null) {
 			throw new IllegalArgumentException("node must not be null");
@@ -26,7 +27,7 @@ public class RaftServer implements Runnable {
 		final TNonblockingServerTransport transport = new TNonblockingServerSocket(node.getAddress());
 
 		final TProcessor processor = new RaftConsensus.Processor<>(
-			new RaftConsensusService(node)
+			new RaftConsensusService(node, log)
 		);
 
 		this.server = new TNonblockingServer(

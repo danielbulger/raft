@@ -1,28 +1,32 @@
 package com.danielbulger.raft.net;
 
 import com.danielbulger.raft.LocalNode;
+import com.danielbulger.raft.NodeLog;
 import com.danielbulger.raft.rpc.*;
 import org.apache.thrift.TException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.nio.ByteBuffer;
+import java.util.Objects;
 
 public class RaftConsensusService implements RaftConsensus.Iface {
 
 	private static final Logger LOG = LoggerFactory.getLogger(RaftConsensusService.class.getName());
 
 	private final LocalNode node;
+	private final NodeLog nodeLog;
 
-	public RaftConsensusService(LocalNode node) {
-		this.node = node;
+	public RaftConsensusService(LocalNode node, NodeLog nodeLog) {
+		this.node = Objects.requireNonNull(node);
+		this.nodeLog = Objects.requireNonNull(nodeLog);
 	}
 
 	@Override
 	public AppendEntriesResponse appendEntries(AppendEntriesRequest request) throws TException {
 		return new AppendEntriesResponse(
 			node.getCurrentTerm(),
-			node.getLastLogIndex(),
+			nodeLog.getLastEntryIndex(),
 			node.appendEntry(request)
 		);
 	}
@@ -36,7 +40,7 @@ public class RaftConsensusService implements RaftConsensus.Iface {
 	public VoteResponse vote(VoteRequest request) {
 		return new VoteResponse(
 			node.getCurrentTerm(),
-			node.voteFor(request)
+			node.grantVoteFor(request)
 		);
 	}
 
@@ -50,7 +54,7 @@ public class RaftConsensusService implements RaftConsensus.Iface {
 
 		// If we are not the leader, direct the client to who
 		// we think the current leader is.
-		if (!node.isLeader()) {
+		if (node.isFollower()) {
 			return new UpdateDataResponse(false, node.getLeaderId());
 		}
 

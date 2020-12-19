@@ -2,13 +2,13 @@ package com.danielbulger.raft.service.persistence;
 
 import com.danielbulger.raft.NodeConfiguration;
 import com.danielbulger.raft.rpc.LogEntry;
-import com.danielbulger.raft.rpc.LogEntryFactory;
 import com.danielbulger.raft.rpc.MetaData;
 import com.danielbulger.raft.service.LogPersistence;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
+import java.nio.ByteBuffer;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -62,7 +62,7 @@ public class Sqlite3LogPersistence implements LogPersistence {
 
 				final byte[] data = rs.getBytes(3);
 
-				entries.add(LogEntryFactory.makeEntry(term, id, data));
+				entries.add(new LogEntry(term, id, ByteBuffer.wrap(data)));
 			}
 
 		} catch (Exception exception) {
@@ -91,7 +91,7 @@ public class Sqlite3LogPersistence implements LogPersistence {
 
 				final byte[] data = rs.getBytes(3);
 
-				return Optional.of(LogEntryFactory.makeEntry(term, id, data));
+				return Optional.of(new LogEntry(term, id, ByteBuffer.wrap(data)));
 			}
 
 		} catch (Exception exception) {

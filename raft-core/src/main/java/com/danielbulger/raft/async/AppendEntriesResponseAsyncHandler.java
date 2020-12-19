@@ -39,7 +39,7 @@ public class AppendEntriesResponseAsyncHandler implements AsyncMethodCallback<Ap
 
 	@Override
 	public void onComplete(AppendEntriesResponse response) {
-		node.onAppendEntryResponse(request, response, peer);
+		node.handleAppendEntryResponse(request, response, peer);
 	}
 
 	@Override
