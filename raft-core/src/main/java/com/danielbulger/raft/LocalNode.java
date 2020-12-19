@@ -177,6 +177,7 @@ public class LocalNode extends Node {
 	private void election() {
 		if (!isFollower()) {
 			LOG.error("leader during election");
+			return;
 		}
 
 		votes = 1;
