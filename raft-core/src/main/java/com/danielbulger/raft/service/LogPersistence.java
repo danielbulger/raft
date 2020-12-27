@@ -19,6 +19,8 @@ public interface LogPersistence {
 
 	Optional<LogEntry> getEntryByIndex(long index);
 
+	Optional<LogEntry> getLastEntry();
+
 	void save(LogEntry entry) throws Exception;
 
 	void delete(LogEntry entry) throws Exception;

@@ -52,17 +52,18 @@ public class Sqlite3LogPersistence implements LogPersistence {
 		try (final Connection connection = connect();
 			 final PreparedStatement stmt = connection.prepareStatement(sql)) {
 
-			final ResultSet rs = stmt.executeQuery();
+			try(final ResultSet rs = stmt.executeQuery()) {
 
-			if (rs.next()) {
+				if (rs.next()) {
 
-				final long id = rs.getLong(1);
+					final long id = rs.getLong(1);
 
-				final long term = rs.getLong(2);
+					final long term = rs.getLong(2);
 
-				final byte[] data = rs.getBytes(3);
+					final byte[] data = rs.getBytes(3);
 
-				entries.add(new LogEntry(term, id, ByteBuffer.wrap(data)));
+					entries.add(new LogEntry(term, id, ByteBuffer.wrap(data)));
+				}
 			}
 
 		} catch (Exception exception) {
@@ -70,6 +71,21 @@ public class Sqlite3LogPersistence implements LogPersistence {
 		}
 
 		return entries;
+	}
+
+	private Optional<LogEntry> getLogEntry(ResultSet rs) throws Exception {
+		if (rs.next()) {
+
+			final long id = rs.getLong(1);
+
+			final long term = rs.getLong(2);
+
+			final byte[] data = rs.getBytes(3);
+
+			return Optional.of(new LogEntry(term, id, ByteBuffer.wrap(data)));
+		}
+
+		return Optional.empty();
 	}
 
 	@Override
@@ -81,23 +97,35 @@ public class Sqlite3LogPersistence implements LogPersistence {
 
 			stmt.setLong(1, index);
 
-			final ResultSet rs = stmt.executeQuery();
-
-			if (rs.next()) {
-
-				final long id = rs.getLong(1);
-
-				final long term = rs.getLong(2);
-
-				final byte[] data = rs.getBytes(3);
-
-				return Optional.of(new LogEntry(term, id, ByteBuffer.wrap(data)));
+			try (final ResultSet rs = stmt.executeQuery()) {
+				return getLogEntry(rs);
 			}
 
 		} catch (Exception exception) {
 			LOG.error(
 				"Unable to fetch log entry id={} due to {}",
 				index,
+				exception.getMessage()
+			);
+		}
+
+		return Optional.empty();
+	}
+
+	@Override
+	public Optional<LogEntry> getLastEntry() {
+		final String sql = "SELECT id, term, data FROM log ORDER BY id DESC LIMIT 1";
+
+		try (final Connection connection = connect();
+			 final PreparedStatement stmt = connection.prepareStatement(sql)) {
+
+			try (final ResultSet rs = stmt.executeQuery()) {
+				return getLogEntry(rs);
+			}
+
+		} catch (Exception exception) {
+			LOG.error(
+				"Unable to fetch last log entry due to {}",
 				exception.getMessage()
 			);
 		}
@@ -189,15 +217,16 @@ public class Sqlite3LogPersistence implements LogPersistence {
 		try (final Connection connection = connect();
 			 final PreparedStatement stmt = connection.prepareStatement(sql)) {
 
-			final ResultSet rs = stmt.executeQuery();
+			try(final ResultSet rs = stmt.executeQuery()) {
 
-			if (rs.next()) {
+				if (rs.next()) {
 
-				final long term = rs.getLong(1);
+					final long term = rs.getLong(1);
 
-				final int votedFor = rs.getInt(2);
+					final int votedFor = rs.getInt(2);
 
-				return Optional.of(new MetaData(term, votedFor));
+					return Optional.of(new MetaData(term, votedFor));
+				}
 			}
 
 		} catch (Exception exception) {

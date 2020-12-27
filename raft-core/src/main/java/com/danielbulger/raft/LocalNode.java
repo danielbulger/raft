@@ -68,6 +68,8 @@ public class LocalNode extends Node {
 
 		this.loadMetaData(persistence);
 		this.addPeers(peers);
+
+		this.resetElection();
 	}
 
 	private void loadMetaData(LogPersistence persistence) {
@@ -77,6 +79,10 @@ public class LocalNode extends Node {
 			this.currentTerm = optional.get().getCurrentTerm();
 			this.votedFor = optional.get().getVotedFor();
 		}
+
+		final Optional<LogEntry> entry = persistence.getLastEntry();
+
+		entry.ifPresent(logEntry -> this.lastApplied = logEntry.getIndex());
 	}
 
 	private void addPeers(Collection<RemoteNode> collection) {
@@ -356,6 +362,7 @@ public class LocalNode extends Node {
 			currentTerm = term;
 			votedFor = -1;
 			state = NodeState.FOLLOWER;
+			votes = 0;
 			this.updateLatestMetaData();
 			resetElection();
 		} finally {
@@ -463,9 +470,10 @@ public class LocalNode extends Node {
 				}
 
 				try {
-					applyLogEntry(entry);
 
 					lastApplied = index;
+
+					applyLogEntry(entry);
 
 					LOG.debug(
 						"Committing entry={}, term={}, lastAppliedIndex={}",
