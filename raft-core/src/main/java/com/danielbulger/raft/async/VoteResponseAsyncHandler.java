@@ -13,11 +13,16 @@ public class VoteResponseAsyncHandler implements AsyncMethodCallback<VoteRespons
 	private static final Logger LOG = LoggerFactory.getLogger(VoteResponseAsyncHandler.class);
 
 	private final VoteRequest request;
-
 	private final LocalNode node;
-
 	private final RemoteNode peer;
 
+	/**
+	 *
+	 * @param request The request that is been responded to.
+	 * @param node The local node that sent the {@code request}.
+	 * @param peer The peer that processed and responded to the {@code request}.
+	 * @throws IllegalArgumentException If {@code request}, {@code node} or {@code peer} are {@code null}.
+	 */
 	public VoteResponseAsyncHandler(VoteRequest request, LocalNode node, RemoteNode peer) {
 
 		if (request == null) {

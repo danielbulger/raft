@@ -13,11 +13,16 @@ public class AppendEntriesResponseAsyncHandler implements AsyncMethodCallback<Ap
 	private static final Logger LOG = LoggerFactory.getLogger(AppendEntriesResponseAsyncHandler.class);
 
 	private final AppendEntriesRequest request;
-
 	private final LocalNode node;
-
 	private final RemoteNode peer;
 
+	/**
+	 *
+	 * @param request The request that is been responded to.
+	 * @param node The local node that sent the {@code request}.
+	 * @param peer The peer that processed and responded to the {@code request}.
+	 * @throws IllegalArgumentException If {@code request}, {@code node} or {@code peer} are {@code null}.
+	 */
 	public AppendEntriesResponseAsyncHandler(AppendEntriesRequest request, LocalNode node, RemoteNode peer) {
 
 		if (request == null) {

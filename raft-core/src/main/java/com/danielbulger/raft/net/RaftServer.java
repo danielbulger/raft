@@ -18,18 +18,18 @@ public class RaftServer implements Runnable {
 
 	private final TServer server;
 
+	/**
+	 * @param node
+	 * @param log
+	 * @throws TTransportException
+	 */
 	public RaftServer(LocalNode node, NodeLog log) throws TTransportException {
-
-		if (node == null) {
-			throw new IllegalArgumentException("node must not be null");
-		}
-
-		final TNonblockingServerTransport transport = new TNonblockingServerSocket(node.getAddress());
 
 		final TProcessor processor = new RaftConsensus.Processor<>(
 			new RaftConsensusService(node, log)
 		);
 
+		final TNonblockingServerTransport transport = new TNonblockingServerSocket(node.getAddress());
 		this.server = new TNonblockingServer(
 			new TNonblockingServer.Args(transport).processor(processor)
 		);
@@ -37,17 +37,17 @@ public class RaftServer implements Runnable {
 
 	@Override
 	public void run() {
-
 		LOG.debug("Starting server {}", server);
-
 		this.server.serve();
 	}
 
+	/**
+	 * Shutdown the server and don't process anymore incoming
+	 * connections.
+	 */
 	public void shutdown() {
 		if (server.isServing()) {
-
 			LOG.debug("Shutting down the server");
-
 			server.stop();
 		}
 	}

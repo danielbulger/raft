@@ -17,9 +17,21 @@ public class RaftConsensusService implements RaftConsensus.Iface {
 	private final LocalNode node;
 	private final NodeLog nodeLog;
 
+	/**
+	 *
+	 * @param node
+	 * @param nodeLog
+	 * @throws IllegalArgumentException If {@code node} or {@code nodeLog} are {@code null}.
+	 */
 	public RaftConsensusService(LocalNode node, NodeLog nodeLog) {
-		this.node = Objects.requireNonNull(node);
-		this.nodeLog = Objects.requireNonNull(nodeLog);
+		if(node == null) {
+			throw new IllegalArgumentException();
+		}
+		if(nodeLog == null) {
+			throw new IllegalArgumentException();
+		}
+		this.node = node;
+		this.nodeLog = nodeLog;
 	}
 
 	@Override

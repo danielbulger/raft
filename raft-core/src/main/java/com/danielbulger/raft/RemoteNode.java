@@ -9,7 +9,6 @@ public class RemoteNode extends Node {
 	private final RaftClient client;
 
 	private long nextIndex;
-
 	private long matchIndex = 0;
 
 	public RemoteNode(int id, InetSocketAddress address) {

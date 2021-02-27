@@ -57,9 +57,7 @@ public class Sqlite3LogPersistence implements LogPersistence {
 				if (rs.next()) {
 
 					final long id = rs.getLong(1);
-
 					final long term = rs.getLong(2);
-
 					final byte[] data = rs.getBytes(3);
 
 					entries.add(new LogEntry(term, id, ByteBuffer.wrap(data)));
@@ -77,9 +75,7 @@ public class Sqlite3LogPersistence implements LogPersistence {
 		if (rs.next()) {
 
 			final long id = rs.getLong(1);
-
 			final long term = rs.getLong(2);
-
 			final byte[] data = rs.getBytes(3);
 
 			return Optional.of(new LogEntry(term, id, ByteBuffer.wrap(data)));
@@ -96,7 +92,6 @@ public class Sqlite3LogPersistence implements LogPersistence {
 			 final PreparedStatement stmt = connection.prepareStatement(sql)) {
 
 			stmt.setLong(1, index);
-
 			try (final ResultSet rs = stmt.executeQuery()) {
 				return getLogEntry(rs);
 			}
@@ -143,13 +138,9 @@ public class Sqlite3LogPersistence implements LogPersistence {
 			try (final PreparedStatement stmt = connection.prepareStatement(sql)) {
 
 				stmt.setLong(1, entry.getIndex());
-
 				stmt.setLong(2, entry.getTerm());
-
 				stmt.setBytes(3, entry.getData());
-
 				stmt.executeUpdate();
-
 				connection.commit();
 
 			} catch (Exception exception) {
@@ -170,9 +161,7 @@ public class Sqlite3LogPersistence implements LogPersistence {
 			try (final PreparedStatement stmt = connection.prepareStatement(sql)) {
 
 				stmt.setLong(1, entry.getIndex());
-
 				stmt.executeUpdate();
-
 				connection.commit();
 
 			} catch (Exception exception) {
@@ -193,11 +182,8 @@ public class Sqlite3LogPersistence implements LogPersistence {
 			try (final PreparedStatement stmt = connection.prepareStatement(sql)) {
 
 				stmt.setLong(1, metaData.getCurrentTerm());
-
 				stmt.setInt(2, metaData.getVotedFor());
-
 				stmt.executeUpdate();
-
 				connection.commit();
 
 			} catch (Exception exception) {
@@ -222,9 +208,7 @@ public class Sqlite3LogPersistence implements LogPersistence {
 				if (rs.next()) {
 
 					final long term = rs.getLong(1);
-
 					final int votedFor = rs.getInt(2);
-
 					return Optional.of(new MetaData(term, votedFor));
 				}
 			}

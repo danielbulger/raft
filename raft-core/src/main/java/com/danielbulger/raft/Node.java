@@ -6,7 +6,6 @@ import java.util.Objects;
 public abstract class Node {
 
 	private final int id;
-
 	private final InetSocketAddress address;
 
 	protected Node(int id, InetSocketAddress address) {

@@ -5,15 +5,10 @@ import java.net.InetSocketAddress;
 public class NodeConfiguration {
 
 	private final int id;
-
 	private final String host;
-
 	private final int port;
-
 	private final long heartBeat;
-
 	private final long heartBeatTimeout;
-
 	private final String storageFile;
 
 	public NodeConfiguration(

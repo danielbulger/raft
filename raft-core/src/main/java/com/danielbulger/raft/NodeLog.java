@@ -101,11 +101,9 @@ public class NodeLog {
 
 	public List<LogEntry> getOlder(long index) {
 		final long lastEntryIndex = getLastEntryIndex();
-
 		final List<LogEntry> logs = new ArrayList<>();
 
 		readLock.lock();
-
 		try {
 			for (long i = index; i <= lastEntryIndex; ++i) {
 				logs.add(entries.get(i));

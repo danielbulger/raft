@@ -36,12 +36,11 @@ public class LocalNode extends Node {
 
 	private final Map<Integer, RemoteNode> peers = new ConcurrentHashMap<>();
 
-	private final ScheduledExecutorService executor;
-
 	private ScheduledFuture<?> electionFuture;
 	private ScheduledFuture<?> heartBeatFuture;
 	private final LogPersistence persistence;
 
+	private final ScheduledExecutorService executor;
 	private final ReentrantLock commitLock = new ReentrantLock();
 	private final ReentrantLock electionLock = new ReentrantLock();
 
@@ -72,6 +71,11 @@ public class LocalNode extends Node {
 		this.resetElection();
 	}
 
+	/**
+	 * Load the all the metadata from the persistence storage.
+	 *
+	 * @param persistence The {@link LogPersistence} to load the metadata from.
+	 */
 	private void loadMetaData(LogPersistence persistence) {
 		final Optional<MetaData> optional = persistence.getLatestMetaData();
 
@@ -81,10 +85,14 @@ public class LocalNode extends Node {
 		}
 
 		final Optional<LogEntry> entry = persistence.getLastEntry();
-
 		entry.ifPresent(logEntry -> this.lastApplied = logEntry.getIndex());
 	}
 
+	/**
+	 * Add all the {@link RemoteNode} peers in the given {@link Collection}.
+	 *
+	 * @param collection The {@link RemoteNode}s that will be added.
+	 */
 	private void addPeers(Collection<RemoteNode> collection) {
 		for (final RemoteNode node : collection) {
 			if (node != null) {
@@ -93,6 +101,9 @@ public class LocalNode extends Node {
 		}
 	}
 
+	/**
+	 * Cancel the pending election future if one exists.
+	 */
 	private void cancelElection() {
 		if (electionFuture != null && !electionFuture.isDone()) {
 			electionFuture.cancel(true);
@@ -101,6 +112,9 @@ public class LocalNode extends Node {
 		electionFuture = null;
 	}
 
+	/**
+	 * Reset the election state by cancelling any pending one and rescheduling a new election.
+	 */
 	private void resetElection() {
 		cancelElection();
 
@@ -114,6 +128,9 @@ public class LocalNode extends Node {
 		);
 	}
 
+	/**
+	 * Cancel the pending heartbeat future if one exists.
+	 */
 	private void cancelHeartBeat() {
 		if (heartBeatFuture != null && !heartBeatFuture.isDone()) {
 			heartBeatFuture.cancel(true);
@@ -122,6 +139,9 @@ public class LocalNode extends Node {
 		heartBeatFuture = null;
 	}
 
+	/**
+	 * Reset the heartbeat state by cancelling any pending one and rescheduling a new heartbeat.
+	 */
 	private void scheduleHeartBeat() {
 		cancelHeartBeat();
 
@@ -136,6 +156,10 @@ public class LocalNode extends Node {
 		);
 	}
 
+	/**
+	 * Emit a heartbeat to all {@link RemoteNode} peers. This will only
+	 * execute if the {@link LocalNode} is a {@link NodeState#LEADER}.
+	 */
 	private void emitHeartBeat() {
 		if (isFollower()) {
 			LOG.error("Tried to emit heartbeat on follower");
@@ -158,6 +182,13 @@ public class LocalNode extends Node {
 		}
 	}
 
+	/**
+	 * Replicates the given data across all the {@link RemoteNode} peers. This will only be successful
+	 * if this {@link LocalNode} is a leader.
+	 *
+	 * @param data The data to replicate across the peers.
+	 * @throws Exception If the {@link LocalNode} is a follower.
+	 */
 	public void replicate(byte[] data) throws Exception {
 		if (isFollower()) {
 			throw new Exception("replicate called on follower");
@@ -180,6 +211,10 @@ public class LocalNode extends Node {
 		}
 	}
 
+	/**
+	 * Call a new election and request votes from all the {@link RemoteNode} peers. If the {@link LocalNode}
+	 * is already a leader, this will be a {@code no-op}.
+	 */
 	private void election() {
 		if (!isFollower()) {
 			LOG.error("leader during election");
@@ -196,6 +231,9 @@ public class LocalNode extends Node {
 		this.requestVote();
 	}
 
+	/**
+	 * Update the metadata state with the {@link LogPersistence}.
+	 */
 	private void updateLatestMetaData() {
 
 		try {
@@ -207,6 +245,9 @@ public class LocalNode extends Node {
 		}
 	}
 
+	/**
+	 * Send a {@link VoteRequest} to all {@link RemoteNode}s.
+	 */
 	private void requestVote() {
 
 		final LogEntry entry = nodeLog.getLastEntry();
@@ -235,6 +276,12 @@ public class LocalNode extends Node {
 		}
 	}
 
+	/**
+	 * Create and send an {@link AppendEntriesRequest} to the given {@link RemoteNode}.
+	 *
+	 * @param peer The {@link RemoteNode} peer to send the data to.
+	 * @throws Exception If the request fails for whatever reason.
+	 */
 	private void sendAppendRequest(RemoteNode peer) throws Exception {
 
 		final AppendEntriesRequest request = makeAppendRequest(peer);
@@ -245,6 +292,12 @@ public class LocalNode extends Node {
 		);
 	}
 
+	/**
+	 * Make a new {@link AppendEntriesRequest}
+	 *
+	 * @param peer The {@link RemoteNode} that the request will be sent to.
+	 * @return The newly created {@link AppendEntriesRequest}
+	 */
 	private AppendEntriesRequest makeAppendRequest(final RemoteNode peer) {
 
 		final long prevIndex = peer.getPrevIndex();
@@ -261,6 +314,11 @@ public class LocalNode extends Node {
 		);
 	}
 
+	/**
+	 * @param prevLogIndex
+	 * @param numEntries
+	 * @return
+	 */
 	private long getLeaderCommitIndex(long prevLogIndex, int numEntries) {
 		return Math.min(
 			nodeLog.getLastEntryIndex(),
@@ -346,9 +404,7 @@ public class LocalNode extends Node {
 				}
 
 				peer.setMatchIndex(request.getPrevLogIndex() + request.getEntriesSize());
-
 				peer.setNextIndex(peer.getMatchIndex() + 1);
-
 				applyNextEntry();
 			}
 		} finally {
@@ -356,6 +412,11 @@ public class LocalNode extends Node {
 		}
 	}
 
+	/**
+	 * Step down as the leader and adjust the current term to the {@code term}.
+	 *
+	 * @param term The new term.
+	 */
 	private void stepDown(long term) {
 		electionLock.lock();
 		try {
@@ -370,17 +431,17 @@ public class LocalNode extends Node {
 		}
 	}
 
+	/**
+	 * Become a leader and {@link #emitHeartBeat()} to all {@link RemoteNode} peers.
+	 */
 	private void becomeLeader() {
 		LOG.debug("Becoming leader...");
 
 		electionLock.lock();
 
 		try {
-
 			state = NodeState.LEADER;
-
 			votes = 0;
-
 			leaderId = super.getId();
 
 			final long entryIndex = nodeLog.getLastEntryIndex();
@@ -391,9 +452,7 @@ public class LocalNode extends Node {
 			}
 
 			cancelElection();
-
 			scheduleHeartBeat();
-
 		} finally {
 			electionLock.unlock();
 		}
@@ -457,9 +516,7 @@ public class LocalNode extends Node {
 			}
 
 			final long oldCommitIndex = commitIndex;
-
 			commitIndex = newCommitIndex;
-
 			updateLatestMetaData();
 
 			for (long index = oldCommitIndex + 1; index <= commitIndex; ++index) {
@@ -472,9 +529,7 @@ public class LocalNode extends Node {
 				try {
 
 					lastApplied = index;
-
 					applyLogEntry(entry);
-
 					LOG.debug(
 						"Committing entry={}, term={}, lastAppliedIndex={}",
 						index,
@@ -577,7 +632,6 @@ public class LocalNode extends Node {
 			}
 
 			final List<LogEntry> newEntries = getNewLogEntries(request.getEntries());
-
 			nodeLog.appendEntries(newEntries);
 
 			updateCommitIndex(request.getLeaderCommitIndex());
@@ -589,6 +643,10 @@ public class LocalNode extends Node {
 		}
 	}
 
+	/**
+	 * @param requestEntries
+	 * @return
+	 */
 	private List<LogEntry> getNewLogEntries(List<LogEntry> requestEntries) {
 
 		final long firstIndex = nodeLog.getFirstEntryIndex();
@@ -616,16 +674,20 @@ public class LocalNode extends Node {
 		return newEntries;
 	}
 
-	private void updateCommitIndex(long leader) {
-
-		if (leader > commitIndex) {
-			commitIndex = Math.min(
-				leader,
-				nodeLog.getLastEntryIndex()
-			);
+	/**
+	 * Update the commit index last on the leader's commit index.
+	 *
+	 * @param leaderCommitIndex The leader's commit index.
+	 */
+	private void updateCommitIndex(long leaderCommitIndex) {
+		if (leaderCommitIndex > commitIndex) {
+			commitIndex = Math.min(leaderCommitIndex, nodeLog.getLastEntryIndex());
 		}
 	}
 
+	/**
+	 * Apply the last log entry to the {@link StateMachine}.
+	 */
 	private void updateApplied() {
 		if (lastApplied < commitIndex) {
 			for (long index = lastApplied + 1; index <= commitIndex; ++index) {
@@ -636,18 +698,40 @@ public class LocalNode extends Node {
 		}
 	}
 
+	/**
+	 * Validates the {@link LogEntry} against the given {@code term} id.
+	 *
+	 * @param entry The {@link LogEntry} that will be validated.
+	 * @param term  The term that will be validated against.
+	 * @return {@code true} if the {@link LogEntry}s term matches the {@code term}, {@code false} otherwise.
+	 */
 	private boolean validateLogTerm(LogEntry entry, long term) {
 		return entry != null && entry.getTerm() == term;
 	}
 
+	/**
+	 * Check whether this {@link LocalNode} is a leader or not.
+	 *
+	 * @return {@code true} if the {@link LocalNode} is {@link NodeState#LEADER}, {@code false} otherwise.
+	 */
 	public boolean isFollower() {
 		return state != NodeState.LEADER;
 	}
 
+	/**
+	 * Get the current leader id.
+	 *
+	 * @return The leader id.
+	 */
 	public int getLeaderId() {
 		return leaderId;
 	}
 
+	/**
+	 * Get the current term identifier.
+	 *
+	 * @return The current term.
+	 */
 	public long getCurrentTerm() {
 		return currentTerm;
 	}
